@@ -1,0 +1,50 @@
+Context
+You have two images/screenshots for comparison:
+1.	Baseline (Figma): The original design mock up exported from Figma.
+2.	Current (Rendered UI): The live application screen captured from the device.
+Minor pixel level discrepancies (up to ±3px) are acceptable; anything larger or affecting layout, style, or readability should be flagged.
+
+Objective
+Generate a structured deviation analysis report that:
+•	Identifies all visual differences between the Baseline and Current screens.
+•	Classifies each difference as Minor (≤3px deviation or non impactful) or Major (>3px or visually significant).
+•	Provides actionable recommendations for resolving Major deviations.
+
+Input
+•	Either of two will be present -
+        A side by side file (or tool output) showing Baseline on one page and Current on the opposite page.
+        or
+        Two images, one showing base figma (file 1) and another one rendered (file 2).
+•	Highlight overlays marking changed regions (if available).
+
+Analysis Criteria
+1.	Minor Deviations (Acceptable)
+o	Positional shifts ≤3 pixels (horizontal or vertical).
+o	Slight typography changes (font weight, spacing) that do not break hierarchy.
+o	Subtle color hue/saturation differences within design tolerance.
+2.	Major Deviations (Unacceptable)
+o	Component position offset >3 pixels or misaligned grid layout.
+o	Text truncation, wrong typography size, or replaced font family.
+o	Incorrect colors outside brand palette or contrast issues.
+o	Missing, extra, or reshaped UI elements altering the intended design.
+o	Difference in text.
+________________________________________
+Report Structure
+Produce a Markdown table summarizing:
+Component	Description of Difference	Severity	Pixel Deviation	Recommendation
+e.g. Title "My Account"	Shifted 5px down	Major	5px vertical	Align text to baseline Y coordinate
+Final Summary
+•	Overall Verdict: Pass / Fail
+•	Total Minor Deviations: X
+•	Total Major Deviations: Y
+Action Items
+List prioritized fixes for all Major deviations with suggested design spec adjustments or development checks.
+________________________________________
+Attachments
+--- Baseline (Figma) Attachment: {file1_name} ---
+(base64-encoded content)
+{file1_b64}
+
+--- Current (Rendered UI): {file2_name} ---
+(base64-encoded content)
+{file2_b64}

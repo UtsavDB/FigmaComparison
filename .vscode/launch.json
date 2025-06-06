@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run PDF Upload UI",
+            "type": "debugpy",
+            "request": "launch",
+            // "program": "${workspaceFolder}/ui_upload.py",
+             "program": "${workspaceFolder}/FigmaComparison.py",
+            "console": "integratedTerminal",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
