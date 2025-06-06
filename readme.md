@@ -26,16 +26,14 @@ Ensure the following environment variables are set either in your shell or `.env
 
 1. Clone the repository:
     ```bash
-    git clone https://your-repo-url.git
+    git clone https://github.com/UtsavDB/FigmaComparison
     cd your-repo
     ```
 
 2. Install required dependencies:
     ```bash
-    pip install openai python-dotenv
+    pip install -r requirements.txt
     ```
 
 ---
-
-## Folder Structure
 
