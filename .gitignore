@@ -1,4 +1,6 @@
 FigmaComparisson-env/
 .env
-Inputs/Baseline.pdf
-Inputs/Current.pdf
+Inputs/
+Inputs/
+Output/
+__pycache__/FigmaComparison.cpython-312.pyc

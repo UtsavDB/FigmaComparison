@@ -1,167 +1,113 @@
-# app.py
+# UI.py – Dark‑theme interface with live Markdown preview + raw source
+# -------------------------------------------------------------------
+# Streamlit app for comparing Figma screenshots or a diff‑PDF against UI renders.
+# This build fixes the **preview still empty** issue by handling both return‐types
+# from `compare_figma_and_ui()`:
+#   • It might return raw Markdown **content** (string)
+#   • Or a **path** to a generated .md file
+# We now detect which case we have, read the file when necessary, and always
+# pass the real Markdown text to the preview / raw viewer / download button.
+
 import os
-import datetime
+import tempfile
+import datetime as dt
 import streamlit as st
 from FigmaComparison import compare_figma_and_ui
 
-# ---- Page config ----
-st.set_page_config(
-    page_title="Compare Figma Designs with UI Renders",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-# ---- CSS & Navbar HTML ----
+# ── Page config & dark theme override ─────────────────────────────────────────
+st.set_page_config(page_title="Compare Figma UI", layout="wide")
 st.markdown(
     """
     <style>
-      /* reset Streamlit padding */
-      .block-container { padding: 0; }
-
-      /* Navbar */
-      .nav { display: flex; justify-content: space-between; align-items: center;
-             padding: 0.75rem 2rem; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-      .nav .brand { font-weight: bold; font-size: 1.25rem; }
-      .nav-links a { margin-right: 1.5rem; color: #333; text-decoration: none; font-weight: 500; }
-      .nav-links a:last-child { margin-right: 0; }
-      .btn-contact { 
-        background-color: #007bff; color: #fff; padding: 0.5rem 1rem; border-radius: 4px;
-        text-decoration: none; font-weight: 500;
-      }
-
-      /* Title & subtitle */
-      .header { padding: 2rem 2rem 0 2rem; }
-      .header h1 { margin-bottom: 0.25rem; }
-      .header p { margin-top: 0; color: #555; }
-
-      /* Upload area */
-      .upload-card { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-      .dropzone { border: 2px dashed #ccc !important;
-                  border-radius: 6px; padding: 2rem; text-align: center; color: #666;
-                  font-size: 0.95rem; }
-      /* Streamlit file_uploader comes wrapped; force it to fit */
-      div[data-testid="fileUploader"] > label { display: none; }
-      div[data-testid="fileUploader"] { padding: 0 !important; }
-
-      /* Buttons */
-      .process-btn button { background-color: #007bff !important; color: #fff !important;
-                             padding: 0.6rem 1.2rem; border-radius: 4px; border: none; }
-      .download-btn button { background-color: #6c757d !important; color: #fff !important;
-                              padding: 0.5rem 1rem; border-radius: 4px; border: none; }
-
-      /* Generated markdown area */
-      .results { background: #f8f9fa; border-radius: 8px; padding: 1.5rem; min-height: 200px; }
+      /* Remove default white cards and containers */
+      section.block-container, .stFileUploader, .stButton { background-color: transparent !important; }
+      /* Ensure dark background */
+      .stApp, .stApp>div { background-color: #0f0f0f !important; color: #f5f5f5 !important; }
     </style>
-
-    <div class="nav">
-      <div class="brand">Aristocrat Leisure Limited</div>
-      <div class="nav-links">
-        <a href="#">Home</a>
-        <a href="#">Products</a>
-        <a href="#">Services</a>
-        <a href="#">Support</a>
-        <a href="#">About Us</a>
-        <a href="#" class="btn-contact">Contact Us</a>
-      </div>
-    </div>
     """,
     unsafe_allow_html=True,
 )
 
-# ---- Header ----
-st.markdown(
-    """
-    <div class="header">
-      <h1>Compare Figma Designs with UI Renders</h1>
-      <p>Upload your Figma design screenshots or a PDF file to compare with UI renders. The system will generate a markdown file for your review and download.</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
+# ── Header ─────────────────────────────────────────────────────────────────────
+st.title("🔍 Compare Figma design to live UI renders")
+st.write(
+    "Upload **two screenshots** (Figma & Implementation) *or* a **single diff‑PDF**. "
+    "Click **Process Files** to generate a Markdown deviation report."
 )
 
-# ---- File upload UI ----
-col1, col2 = st.columns(2)
-
+# ── File uploaders ─────────────────────────────────────────────────────────────
+col1, col2 = st.columns(2, gap="large")
 with col1:
-    st.markdown('<div class="upload-card">', unsafe_allow_html=True)
-    st.markdown("**Upload Screenshots**", unsafe_allow_html=True)
-    st.markdown('<div class="dropzone">Drag & drop or click to browse</div>', unsafe_allow_html=True)
-    imgs = st.file_uploader(
-        label="", type=["png","jpg","jpeg"], accept_multiple_files=True, key="imgs"
+    screenshots = st.file_uploader(
+        "Screenshots (exactly two – PNG / JPG)",
+        type=["png", "jpg", "jpeg"],
+        accept_multiple_files=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
-
 with col2:
-    st.markdown('<div class="upload-card">', unsafe_allow_html=True)
-    st.markdown("**Upload PDF**", unsafe_allow_html=True)
-    st.markdown('<div class="dropzone">Drag & drop or click to browse</div>', unsafe_allow_html=True)
-    pdf = st.file_uploader(label="", type=["pdf"], accept_multiple_files=False, key="pdf")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ---- Process button ----
-st.markdown('<div class="upload-card process-btn" style="margin-top:1rem;">', unsafe_allow_html=True)
-if st.button("Process Files"):
-    # prepare Inputs folder
-    os.makedirs("Inputs", exist_ok=True)
-    ts = datetime.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
-
-    figma_path = ui_path = diff_pdf = None
-
-    if pdf:
-        # save only PDF
-        name = f"pdf_{ts}.pdf"
-        pdf_path = os.path.join("Inputs", name)
-        with open(pdf_path, "wb") as f:
-            f.write(pdf.getbuffer())
-        diff_pdf = pdf_path
-    else:
-        # require exactly two images
-        if len(imgs) != 2:
-            st.error("Please upload exactly two images (Figma + UI).")
-        else:
-            f1, f2 = imgs
-            ext1 = os.path.splitext(f1.name)[1]
-            ext2 = os.path.splitext(f2.name)[1]
-            figma_path = os.path.join("Inputs", f"figma_{ts}{ext1}")
-            ui_path    = os.path.join("Inputs", f"ui_{ts}{ext2}")
-            with open(figma_path, "wb") as f:
-                f.write(f1.getbuffer())
-            with open(ui_path, "wb") as f:
-                f.write(f2.getbuffer())
-
-    # run comparison
-    if pdf or (figma_path and ui_path):
-        md_file = compare_figma_and_ui(
-            figma_jpeg=figma_path,
-            ui_jpeg=ui_path,
-            difference_pdf=diff_pdf
-        )
-        # read markdown
-        md = open(md_file, encoding="utf-8").read()
-        st.session_state["md"] = md
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-# ---- Generated Markdown section ----
-st.markdown('<div class="upload-card" style="margin-top:2rem;">', unsafe_allow_html=True)
-st.markdown("**Generated Markdown**", unsafe_allow_html=True)
-
-dl_disabled = "disabled" if "md" not in st.session_state else ""
-href = ""
-if "md" in st.session_state:
-    data = st.session_state["md"].encode("utf-8")
-    href = st.download_button(
-        label="Download Markdown",
-        data=data,
-        file_name="comparison.md",
-        mime="text/markdown",
-        key="download",
+    pdf_file = st.file_uploader(
+        "Diff‑PDF (upload one file only)",
+        type=["pdf"],
+        accept_multiple_files=False,
     )
 
-st.markdown('<div class="results">', unsafe_allow_html=True)
-if "md" in st.session_state:
-    st.markdown(st.session_state["md"], unsafe_allow_html=False)
-else:
-    st.markdown("_No Markdown Generated Yet_\n\nUpload a file to generate the markdown content.")
-st.markdown("</div>", unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def to_temp_file(uploaded):
+    """Save an UploadedFile to a temp path and return the path."""
+    suffix = os.path.splitext(uploaded.name)[1]
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "wb") as f:
+        f.write(uploaded.getbuffer())
+    return path
+
+# ── Processing ─────────────────────────────────────────────────────────────────
+if st.button("🔍 Process Files"):
+    # Decide mode & validate
+    if screenshots and not pdf_file:
+        if len(screenshots) != 2:
+            st.error("Please upload exactly two screenshots.")
+            st.stop()
+        f1_path = to_temp_file(screenshots[0])
+        f2_path = to_temp_file(screenshots[1])
+        result = compare_figma_and_ui(f1_path, f2_path)
+    elif pdf_file and not screenshots:
+        pdf_path = to_temp_file(pdf_file)
+        result = compare_figma_and_ui(pdf_path)
+    else:
+        st.error("Choose either two screenshots *or* one PDF — not both and not none.")
+        st.stop()
+
+    st.success("✅ Analysis complete – scroll down for the report.")
+
+    # ── Determine if `result` is a path or raw Markdown ───────────────────────
+    if isinstance(result, str) and os.path.isfile(result):
+        md_path = result
+        with open(md_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+    else:
+        md_content = str(result)
+        # Persist to /output for download convenience
+        os.makedirs("output", exist_ok=True)
+        timestamp = dt.datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+        md_path = os.path.join("output", f"{timestamp}.md")
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(md_content)
+
+    # ── Report viewer ──────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("Generated Report 📄")
+    preview_tab, raw_tab = st.tabs(["Preview", "Raw Source"])
+
+    with preview_tab:
+        st.markdown(md_content, unsafe_allow_html=False)
+
+    with raw_tab:
+        st.text_area("Raw Markdown", value=md_content, height=400)
+
+    # ── Download button ───────────────────────────────────────────────────────
+    st.download_button(
+        label="Download Markdown",
+        data=md_content,
+        file_name=os.path.basename(md_path),
+        mime="text/markdown",
+    )

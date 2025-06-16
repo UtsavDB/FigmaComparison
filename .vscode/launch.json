@@ -5,7 +5,11 @@
             "name": "Run PDF Upload UI",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/UI.py",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "${workspaceFolder}/UI.py"
+            ],
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
         }
