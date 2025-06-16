@@ -55,22 +55,22 @@ def build_full_prompt(template: str, file1_path: str, file2_path: str) -> str:
 # """
 #     return template + "\n" + attachment_block
 
-def main():
-    parser = argparse.ArgumentParser(description="Send a template + two attachments to Azure OpenAI")
-    parser.add_argument("file1", nargs="?", help="First file path")
-    parser.add_argument("file2", nargs="?", help="Second file path")
-    args = parser.parse_args()
-
-    if not args.file1:
-        args.file1 = "./Inputs/Overview and schedule Figma.png"
-    if not args.file2:
-        args.file2 = "./Inputs/Overview and schedule Implementation.png"
-
+def compare_figma_and_ui(figma_jpeg=None, ui_jpeg=None, difference_pdf=None):
+    """
+    Compares Figma and UI images or a difference PDF using Azure OpenAI.
+    If difference_pdf is provided, figma_jpeg and ui_jpeg are ignored.
+    """
     load_env()
     prompt_template = read_prompt_template()
-    full_prompt = build_full_prompt(prompt_template, args.file1, args.file2)
-    
-    # Call Azure OpenAI chat using the new client API
+    if difference_pdf:
+        # Use the difference PDF as both file1 and file2 for prompt (or adjust as needed)
+        file1 = difference_pdf
+        file2 = difference_pdf
+    else:
+        file1 = figma_jpeg
+        file2 = ui_jpeg
+    full_prompt = build_full_prompt(prompt_template, file1, file2)
+
     client = openai.AzureOpenAI(
         api_key=os.getenv("OPENAI_API_KEY"),
         api_version=os.getenv("OPENAI_API_VERSION"),
@@ -83,15 +83,34 @@ def main():
     print(f"  OPENAI_API_VERSION: {openai.api_version}")
     deployment_name = os.getenv("OPENAI_DEPLOYMENT_NAME")
     print(f"  deployment_name: {deployment_name}")
-    
+
     resp = client.chat.completions.create(
         model=deployment_name,
         messages=[{"role": "user", "content": full_prompt}]
     )
-    output_filename = datetime.now().strftime("%Y-%b-%d") + ".md"
-    with open(output_filename, "w", encoding="utf-8") as f:
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    output_filename = datetime.now().strftime("%d_%m_%Y_%H_%M_%S") + ".md"
+    output_path = os.path.join(output_dir, output_filename)
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(resp.choices[0].message.content)
-    print(f"Response saved to {output_filename}")
+    print(f"Response saved to {output_path}")
+    return output_path
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Send a template + two attachments to Azure OpenAI")
+    parser.add_argument("file1", nargs="?", help="First file path")
+    parser.add_argument("file2", nargs="?", help="Second file path")
+    parser.add_argument("--difference_pdf", help="Difference PDF file path", default=None)
+    args = parser.parse_args()
+
+    if args.difference_pdf:
+        compare_figma_and_ui(difference_pdf=args.difference_pdf)
+    else:
+        file1 = args.file1 or "./Inputs/Overview and schedule Figma.png"
+        file2 = args.file2 or "./Inputs/Overview and schedule Implementation.png"
+        compare_figma_and_ui(figma_jpeg=file1, ui_jpeg=file2)
 
 
 if __name__ == "__main__":

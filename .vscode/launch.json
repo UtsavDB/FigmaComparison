@@ -5,8 +5,7 @@
             "name": "Run PDF Upload UI",
             "type": "debugpy",
             "request": "launch",
-            // "program": "${workspaceFolder}/ui_upload.py",
-             "program": "${workspaceFolder}/FigmaComparison.py",
+            "program": "${workspaceFolder}/UI.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
         }
